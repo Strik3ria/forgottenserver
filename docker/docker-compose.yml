@@ -1,0 +1,61 @@
+version: "3.3"
+
+#Global vars anchors
+x-server-ip: &server-ip
+  SERVER_IP: 10.2.0.141
+
+services:
+  server:
+    build:
+      context: ../
+      dockerfile: docker/server/Dockerfile
+    restart: unless-stopped
+    ports:
+      - 7171:7171
+      - 7172:7172
+    volumes:
+      - ../data:/srv/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      <<: *server-ip
+      SERVER_DB_HOST: mysql
+
+  mysql:
+    build:
+      context: ../
+      dockerfile: docker/mysql/Dockerfile
+    restart: unless-stopped
+    environment:
+      - MYSQL_DATABASE=otserver
+      - MYSQL_USER=otserver
+      - MYSQL_PASSWORD=otserver
+      - MYSQL_RANDOM_ROOT_PASSWORD=yes
+    volumes:
+      - otserver_data:/var/lib/mysql
+    ports:
+      - 3306:3306
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "--silent"]
+      interval: 5s
+
+  website:
+    build:
+      context: ../
+      dockerfile: docker/data/Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *server-ip
+      WEB_DOCUMENT_ROOT: /tmp/web/
+      WEB_DOCUMENT_INDEX: index.php
+    ports:
+      - 80:80
+    volumes:
+      - ./data/web:/tmp/web
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  otserver_data:
